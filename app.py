@@ -1,20 +1,24 @@
-"""LinkedIn to Portfolio Site - Flask Application."""
+"""LinkedIn to Portfolio Site - Flask Application.
+
+Cloudflare credentials are stored server-side. The user never needs
+to create an account or provide any token.
+"""
 import os
 import json
 import tempfile
-import shutil
 from flask import Flask, render_template, request, jsonify
 
 from lib.linkedin_parser import parse_linkedin_pdf
 from lib.site_generator import generate_portfolio_html
 from lib.cv_generator import generate_docx, generate_cv_html, generate_cv_pdf
-from lib.vercel_deploy import deploy_to_vercel
+from lib.vercel_deploy import deploy_to_cloudflare, add_domain
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Server-side Cloudflare credentials (set via environment variables)
+CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID", "")
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN", "")
 
 
 @app.route("/")
@@ -26,13 +30,12 @@ def index():
 def parse_pdf():
     """Parse uploaded LinkedIn PDF and return structured data."""
     if "pdf" not in request.files:
-        return jsonify({"error": "No PDF file uploaded"}), 400
+        return jsonify({"error": "Nenhum ficheiro PDF enviado"}), 400
 
     pdf_file = request.files["pdf"]
     if not pdf_file.filename:
-        return jsonify({"error": "No file selected"}), 400
+        return jsonify({"error": "Nenhum ficheiro selecionado"}), 400
 
-    # Save PDF temporarily
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     pdf_file.save(tmp.name)
     tmp.close()
@@ -41,28 +44,31 @@ def parse_pdf():
         data = parse_linkedin_pdf(tmp.name)
         return jsonify({"success": True, "data": data})
     except Exception as e:
-        return jsonify({"error": f"Failed to parse PDF: {str(e)}"}), 500
+        return jsonify({"error": f"Erro ao analisar PDF: {str(e)}"}), 500
     finally:
         os.unlink(tmp.name)
 
 
 @app.route("/api/deploy", methods=["POST"])
 def deploy():
-    """Generate site + CV and deploy to Vercel."""
+    """Generate site + CV and deploy to Cloudflare Pages."""
+    if not CF_ACCOUNT_ID or not CF_API_TOKEN:
+        return jsonify({"error": "Servidor nao configurado. Contacte o administrador."}), 500
+
     try:
-        # Get form data
-        vercel_token = request.form.get("vercel_token", "").strip()
         project_name = request.form.get("project_name", "").strip().lower()
         custom_domain = request.form.get("custom_domain", "").strip()
         profile_data = request.form.get("profile_data", "")
 
-        if not vercel_token:
-            return jsonify({"error": "Vercel token is required"}), 400
         if not project_name:
-            return jsonify({"error": "Project name is required"}), 400
+            return jsonify({"error": "Nome do projeto obrigatorio"}), 400
+
+        # Sanitize project name
+        project_name = "".join(c if c.isalnum() or c == "-" else "-" for c in project_name)
+        project_name = project_name.strip("-")[:100]
 
         data = json.loads(profile_data)
-        data["domain"] = custom_domain
+        data["domain"] = custom_domain or f"{project_name}.pages.dev"
 
         # Handle photo
         photo_file = request.files.get("photo")
@@ -82,14 +88,15 @@ def deploy():
         cv_pdf_name = f"CV {data.get('name', 'CV')}.pdf"
         cv_docx_name = f"CV {data.get('name', 'CV')}.docx"
 
-        # Generate portfolio site
+        # Generate portfolio HTML
         site_html = generate_portfolio_html(data, photo_filename=photo_filename, cv_filename=cv_pdf_name)
 
-        # Generate CV HTML and PDF
+        # Generate CV HTML for PDF
         cv_html = generate_cv_html(data, photo_filename=photo_filename)
 
-        cv_pdf_path = None
+        # Generate CV PDF
         cv_pdf_bytes = None
+        cv_pdf_path = None
         try:
             cv_pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             cv_pdf_tmp.close()
@@ -112,13 +119,11 @@ def deploy():
         except Exception as e:
             print(f"Warning: DOCX generation failed: {e}")
 
-        # Prepare deployment files
+        # Build deployment files
         files = {
             "index.html": site_html.encode("utf-8"),
             "cv.html": cv_html.encode("utf-8"),
-            "vercel.json": json.dumps({"cleanUrls": True}).encode("utf-8"),
         }
-
         if photo_bytes:
             files[photo_filename] = photo_bytes
         if cv_pdf_bytes:
@@ -126,19 +131,19 @@ def deploy():
         if docx_bytes:
             files[cv_docx_name] = docx_bytes
 
-        # Deploy to Vercel
-        result = deploy_to_vercel(vercel_token, project_name, files)
+        # Deploy to Cloudflare Pages
+        result = deploy_to_cloudflare(CF_ACCOUNT_ID, CF_API_TOKEN, project_name, files)
 
         # Add custom domain if provided
         domain_result = None
         if custom_domain:
             try:
-                domain_result = add_domain(vercel_token, project_name, custom_domain)
+                domain_result = add_domain(CF_ACCOUNT_ID, CF_API_TOKEN, project_name, custom_domain)
             except Exception as e:
                 domain_result = {"warning": str(e)}
 
-        # Cleanup temp files
-        if photo_tmp:
+        # Cleanup
+        if photo_tmp and os.path.exists(photo_tmp.name):
             os.unlink(photo_tmp.name)
         if cv_pdf_path and os.path.exists(cv_pdf_path):
             os.unlink(cv_pdf_path)
@@ -151,11 +156,11 @@ def deploy():
         })
 
     except json.JSONDecodeError:
-        return jsonify({"error": "Invalid profile data format"}), 400
+        return jsonify({"error": "Dados de perfil invalidos"}), 400
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
     except Exception as e:
-        return jsonify({"error": f"Deployment failed: {str(e)}"}), 500
+        return jsonify({"error": f"Falha no deploy: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

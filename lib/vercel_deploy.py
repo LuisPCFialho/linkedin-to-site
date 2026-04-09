@@ -1,92 +1,109 @@
-"""Deploy static files to Vercel using their API."""
-import base64
+"""Deploy static files to Cloudflare Pages using Direct Upload API."""
+import hashlib
+import json
 import requests
 
 
-def deploy_to_vercel(token, project_name, files, team_id=None):
+BASE_URL = "https://api.cloudflare.com/client/v4"
+
+
+def _headers(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _create_project(account_id, token, project_name):
+    """Create a Cloudflare Pages project (ignores if already exists)."""
+    resp = requests.post(
+        f"{BASE_URL}/accounts/{account_id}/pages/projects",
+        headers={**_headers(token), "Content-Type": "application/json"},
+        json={"name": project_name, "production_branch": "main"},
+        timeout=30,
+    )
+    result = resp.json()
+    # 8000007 = project already exists, that's fine
+    if not result.get("success") and result.get("errors"):
+        code = result["errors"][0].get("code", 0)
+        if code != 8000007:
+            raise RuntimeError(
+                f"Failed to create project: {result['errors'][0].get('message', str(result))}"
+            )
+    return result
+
+
+def deploy_to_cloudflare(account_id, token, project_name, files):
     """
-    Deploy files to Vercel.
+    Deploy files to Cloudflare Pages via Direct Upload.
 
     Args:
-        token: Vercel API token
-        project_name: Name for the Vercel project (lowercase, hyphens ok)
+        account_id: Cloudflare account ID
+        token: Cloudflare API token with Pages edit permission
+        project_name: Project name (lowercase, hyphens)
         files: dict of {filename: bytes_content}
-        team_id: Optional Vercel team ID
 
     Returns:
-        dict with deployment info (url, id, readyState, etc.)
+        dict with url, project_name, id
     """
-    file_list = []
+    # Ensure project exists
+    _create_project(account_id, token, project_name)
+
+    # Build manifest (filename -> sha256 hash)
+    manifest = {}
     for name, content in files.items():
         if isinstance(content, str):
             content = content.encode("utf-8")
-        file_list.append({
-            "file": name,
-            "data": base64.b64encode(content).decode("utf-8"),
-        })
+        manifest[name] = hashlib.sha256(content).hexdigest()
 
-    payload = {
-        "name": project_name,
-        "files": file_list,
-        "target": "production",
-        "projectSettings": {
-            "framework": None,
-        },
+    # Build multipart form
+    multipart = {
+        "branch": (None, "main"),
+        "commit_message": (None, "Deploy portfolio site"),
+        "manifest": (None, json.dumps(manifest)),
     }
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
+    # Add each file as a form field keyed by its hash
+    for name, content in files.items():
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        file_hash = hashlib.sha256(content).hexdigest()
+        multipart[file_hash] = (name, content, "application/octet-stream")
 
-    params = {}
-    if team_id:
-        params["teamId"] = team_id
-
-    response = requests.post(
-        "https://api.vercel.com/v13/deployments",
-        headers=headers,
-        json=payload,
-        params=params,
-        timeout=60,
+    resp = requests.post(
+        f"{BASE_URL}/accounts/{account_id}/pages/projects/{project_name}/deployments",
+        headers=_headers(token),
+        files=multipart,
+        timeout=120,
     )
 
-    result = response.json()
+    result = resp.json()
+    if not result.get("success"):
+        errors = result.get("errors", [{}])
+        msg = errors[0].get("message", str(result)) if errors else str(result)
+        raise RuntimeError(f"Cloudflare deploy failed: {msg}")
 
-    if response.status_code >= 400:
-        error_msg = result.get("error", {}).get("message", str(result))
-        raise RuntimeError(f"Vercel API error ({response.status_code}): {error_msg}")
+    deployment = result.get("result", {})
+    deploy_url = deployment.get("url", "")
+    if deploy_url and not deploy_url.startswith("http"):
+        deploy_url = f"https://{deploy_url}"
 
     return {
-        "url": f"https://{result.get('url', '')}",
-        "alias": [f"https://{a}" for a in result.get("alias", [])],
-        "id": result.get("id", ""),
-        "readyState": result.get("readyState", ""),
+        "url": deploy_url,
+        "project_url": f"https://{project_name}.pages.dev",
+        "id": deployment.get("id", ""),
         "project_name": project_name,
     }
 
 
-def add_domain(token, project_name, domain, team_id=None):
-    """Add a custom domain to a Vercel project."""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-    params = {}
-    if team_id:
-        params["teamId"] = team_id
-
-    response = requests.post(
-        f"https://api.vercel.com/v10/projects/{project_name}/domains",
-        headers=headers,
+def add_domain(account_id, token, project_name, domain):
+    """Add a custom domain to a Cloudflare Pages project."""
+    resp = requests.post(
+        f"{BASE_URL}/accounts/{account_id}/pages/projects/{project_name}/domains",
+        headers={**_headers(token), "Content-Type": "application/json"},
         json={"name": domain},
-        params=params,
         timeout=30,
     )
-
-    result = response.json()
-    if response.status_code >= 400:
-        error_msg = result.get("error", {}).get("message", str(result))
-        raise RuntimeError(f"Failed to add domain: {error_msg}")
-
-    return result
+    result = resp.json()
+    if not result.get("success"):
+        errors = result.get("errors", [{}])
+        msg = errors[0].get("message", str(result)) if errors else str(result)
+        raise RuntimeError(f"Failed to add domain: {msg}")
+    return result.get("result", {})
