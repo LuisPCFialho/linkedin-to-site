@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+start.bat
 uploads/
 venv/
 .vercel/
