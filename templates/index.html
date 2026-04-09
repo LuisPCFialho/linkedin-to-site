@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn to Site - Cria o teu portfolio automaticamente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50:'#f0f4ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#4f63d2',600:'#3b4fb8',700:'#2e3f8f',800:'#1e2a6e',900:'#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .step { display: none; }
+        .step.active { display: block; }
+        .step-indicator.completed { background-color: #4f63d2; color: white; }
+        .step-indicator.current { background-color: #4f63d2; color: white; box-shadow: 0 0 0 4px rgba(79, 99, 210, 0.3); }
+        .step-indicator.pending { background-color: #e5e7eb; color: #9ca3af; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .upload-zone { border: 2px dashed #c7d2fe; transition: all 0.3s; }
+        .upload-zone:hover, .upload-zone.dragover { border-color: #4f63d2; background-color: #f0f4ff; }
+        .loader { border: 3px solid #e5e7eb; border-top: 3px solid #4f63d2; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-brand-50 min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-brand-500 to-blue-400 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-brand-900">LinkedIn to Site</h1>
+                    <p class="text-xs text-gray-500">Portfolio automatico a partir do LinkedIn</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-8">
+
+        <!-- Progress Steps -->
+        <div class="flex items-center justify-center mb-10">
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <div id="ind-1" class="step-indicator current w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                    <span class="ml-2 text-sm font-medium text-gray-700 hidden sm:inline">Upload</span>
+                </div>
+                <div class="w-12 h-0.5 bg-gray-300" id="line-1-2"></div>
+                <div class="flex items-center">
+                    <div id="ind-2" class="step-indicator pending w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                    <span class="ml-2 text-sm font-medium text-gray-400 hidden sm:inline">Rever</span>
+                </div>
+                <div class="w-12 h-0.5 bg-gray-300" id="line-2-3"></div>
+                <div class="flex items-center">
+                    <div id="ind-3" class="step-indicator pending w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                    <span class="ml-2 text-sm font-medium text-gray-400 hidden sm:inline">Deploy</span>
+                </div>
+                <div class="w-12 h-0.5 bg-gray-300" id="line-3-4"></div>
+                <div class="flex items-center">
+                    <div id="ind-4" class="step-indicator pending w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">4</div>
+                    <span class="ml-2 text-sm font-medium text-gray-400 hidden sm:inline">Online!</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 1: Upload -->
+        <div id="step-1" class="step active fade-in">
+            <div class="bg-white rounded-2xl shadow-sm p-8">
+                <h2 class="text-2xl font-bold text-brand-900 mb-2">Faz upload do teu perfil</h2>
+                <p class="text-gray-500 mb-6">Faz download do teu perfil LinkedIn como PDF e carrega-o aqui junto com a tua foto.</p>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                    <p class="text-sm text-blue-800">
+                        <strong>Como obter o PDF do LinkedIn:</strong> Vai ao teu perfil LinkedIn > clica em "Mais" > "Guardar como PDF"
+                    </p>
+                </div>
+
+                <!-- PDF Upload -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">PDF do LinkedIn *</label>
+                    <div id="pdf-zone" class="upload-zone rounded-xl p-8 text-center cursor-pointer" onclick="document.getElementById('pdf-input').click()">
+                        <svg class="w-12 h-12 mx-auto text-brand-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        <p class="text-gray-500" id="pdf-label">Arrasta o PDF ou clica para selecionar</p>
+                        <p class="text-xs text-gray-400 mt-1">Apenas ficheiros .pdf</p>
+                    </div>
+                    <input type="file" id="pdf-input" accept=".pdf" class="hidden" onchange="handlePdfSelect(this)">
+                </div>
+
+                <!-- Photo Upload -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Foto de perfil *</label>
+                    <div id="photo-zone" class="upload-zone rounded-xl p-8 text-center cursor-pointer" onclick="document.getElementById('photo-input').click()">
+                        <div id="photo-preview-container" class="hidden mb-3">
+                            <img id="photo-preview" class="w-24 h-24 rounded-full object-cover mx-auto border-4 border-brand-200">
+                        </div>
+                        <svg id="photo-icon" class="w-12 h-12 mx-auto text-brand-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <p class="text-gray-500" id="photo-label">Arrasta a foto ou clica para selecionar</p>
+                        <p class="text-xs text-gray-400 mt-1">PNG, JPG (recomendado: foto profissional)</p>
+                    </div>
+                    <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="handlePhotoSelect(this)">
+                </div>
+
+                <div id="step1-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                    <p class="text-sm text-red-700" id="step1-error-text"></p>
+                </div>
+
+                <button onclick="parseLinkedIn()" id="btn-parse" class="w-full bg-gradient-to-r from-brand-500 to-blue-500 text-white font-semibold py-3 px-6 rounded-xl hover:from-brand-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <span id="btn-parse-text">Analisar perfil</span>
+                    <span id="btn-parse-loader" class="hidden"><span class="loader mr-2"></span> A analisar...</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: Review -->
+        <div id="step-2" class="step fade-in">
+            <div class="bg-white rounded-2xl shadow-sm p-8">
+                <h2 class="text-2xl font-bold text-brand-900 mb-2">Revê os teus dados</h2>
+                <p class="text-gray-500 mb-6">Verifica se a informacao extraida esta correta. Podes editar qualquer campo.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Nome completo</label>
+                        <input type="text" id="edit-name" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Titulo profissional</label>
+                        <input type="text" id="edit-title" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Localizacao</label>
+                        <input type="text" id="edit-location" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                        <input type="email" id="edit-email" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">LinkedIn URL</label>
+                        <input type="url" id="edit-linkedin" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Sobre mim (resumo)</label>
+                        <textarea id="edit-summary" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Experience preview -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">Experiencia Profissional</h3>
+                    <div id="exp-preview" class="space-y-2"></div>
+                </div>
+
+                <!-- Education preview -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">Formacao Academica</h3>
+                    <div id="edu-preview" class="space-y-2"></div>
+                </div>
+
+                <!-- Skills -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">Competencias</h3>
+                    <div id="skills-preview" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- Languages -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">Idiomas</h3>
+                    <div id="langs-preview" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="goToStep(1)" class="px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors">Voltar</button>
+                    <button onclick="goToStep(3)" class="flex-1 bg-gradient-to-r from-brand-500 to-blue-500 text-white font-semibold py-3 px-6 rounded-xl hover:from-brand-600 hover:to-blue-600 transition-all">Proximo: Deploy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: Deploy -->
+        <div id="step-3" class="step fade-in">
+            <div class="bg-white rounded-2xl shadow-sm p-8">
+                <h2 class="text-2xl font-bold text-brand-900 mb-2">Publica o teu site</h2>
+                <p class="text-gray-500 mb-6">Conecta a tua conta Vercel para publicar automaticamente.</p>
+
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                    <p class="text-sm text-amber-800">
+                        <strong>Como obter o token Vercel:</strong> Vai a
+                        <a href="https://vercel.com/account/tokens" target="_blank" class="underline font-semibold">vercel.com/account/tokens</a>
+                        > "Create Token" > copia e cola aqui.
+                    </p>
+                </div>
+
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Vercel Token *</label>
+                        <input type="password" id="vercel-token" placeholder="Cole o teu token aqui" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Nome do projeto *</label>
+                        <input type="text" id="project-name" placeholder="ex: meu-portfolio" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                        <p class="text-xs text-gray-400 mt-1">Minusculas, hifens permitidos. O site ficara em nome.vercel.app</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Dominio personalizado (opcional)</label>
+                        <input type="text" id="custom-domain" placeholder="ex: meusite.com" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-200 focus:border-brand-500 outline-none">
+                    </div>
+                </div>
+
+                <div id="step3-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                    <p class="text-sm text-red-700" id="step3-error-text"></p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="goToStep(2)" class="px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors">Voltar</button>
+                    <button onclick="deployToVercel()" id="btn-deploy" class="flex-1 bg-gradient-to-r from-brand-500 to-blue-500 text-white font-semibold py-3 px-6 rounded-xl hover:from-brand-600 hover:to-blue-600 transition-all">
+                        <span id="btn-deploy-text">Publicar site</span>
+                        <span id="btn-deploy-loader" class="hidden"><span class="loader mr-2"></span> A publicar...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: Done -->
+        <div id="step-4" class="step fade-in">
+            <div class="bg-white rounded-2xl shadow-sm p-8 text-center">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <h2 class="text-3xl font-bold text-brand-900 mb-2">O teu site esta online!</h2>
+                <p class="text-gray-500 mb-8">O teu portfolio profissional foi publicado com sucesso.</p>
+
+                <div class="bg-brand-50 rounded-xl p-6 mb-6">
+                    <p class="text-sm text-gray-500 mb-2">O teu site:</p>
+                    <a id="deployed-url" href="#" target="_blank" class="text-xl font-bold text-brand-600 hover:text-brand-700 underline"></a>
+                </div>
+
+                <div id="deployed-files" class="text-left bg-gray-50 rounded-xl p-4 mb-6">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Ficheiros publicados:</p>
+                    <ul id="files-list" class="text-sm text-gray-500 space-y-1"></ul>
+                </div>
+
+                <div id="domain-info" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+                    <p class="text-sm text-amber-800" id="domain-info-text"></p>
+                </div>
+
+                <button onclick="location.reload()" class="bg-gradient-to-r from-brand-500 to-blue-500 text-white font-semibold py-3 px-8 rounded-xl hover:from-brand-600 hover:to-blue-600 transition-all">Criar outro site</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center py-6 text-sm text-gray-400">
+        <p>LinkedIn to Site &mdash; Cria o teu portfolio profissional em segundos</p>
+    </footer>
+
+    <script>
+        let profileData = null;
+        let pdfFile = null;
+        let photoFile = null;
+
+        // Drag & drop
+        ['pdf-zone', 'photo-zone'].forEach(id => {
+            const zone = document.getElementById(id);
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (id === 'pdf-zone' && file.type === 'application/pdf') {
+                    pdfFile = file;
+                    document.getElementById('pdf-label').textContent = file.name;
+                    document.getElementById('pdf-zone').style.borderColor = '#4f63d2';
+                } else if (id === 'photo-zone' && file.type.startsWith('image/')) {
+                    handlePhotoFile(file);
+                }
+                updateParseButton();
+            });
+        });
+
+        function handlePdfSelect(input) {
+            if (input.files[0]) {
+                pdfFile = input.files[0];
+                document.getElementById('pdf-label').textContent = pdfFile.name;
+                document.getElementById('pdf-zone').style.borderColor = '#4f63d2';
+                updateParseButton();
+            }
+        }
+
+        function handlePhotoSelect(input) {
+            if (input.files[0]) handlePhotoFile(input.files[0]);
+        }
+
+        function handlePhotoFile(file) {
+            photoFile = file;
+            document.getElementById('photo-label').textContent = file.name;
+            document.getElementById('photo-icon').classList.add('hidden');
+            const preview = document.getElementById('photo-preview');
+            const container = document.getElementById('photo-preview-container');
+            preview.src = URL.createObjectURL(file);
+            container.classList.remove('hidden');
+            updateParseButton();
+        }
+
+        function updateParseButton() {
+            document.getElementById('btn-parse').disabled = !(pdfFile && photoFile);
+        }
+
+        async function parseLinkedIn() {
+            const btn = document.getElementById('btn-parse');
+            const btnText = document.getElementById('btn-parse-text');
+            const btnLoader = document.getElementById('btn-parse-loader');
+            const errorDiv = document.getElementById('step1-error');
+            errorDiv.classList.add('hidden');
+
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnLoader.classList.remove('hidden');
+
+            try {
+                const formData = new FormData();
+                formData.append('pdf', pdfFile);
+
+                const response = await fetch('/api/parse', { method: 'POST', body: formData });
+                const result = await response.json();
+
+                if (!result.success) throw new Error(result.error || 'Failed to parse');
+
+                profileData = result.data;
+                populateReview();
+                goToStep(2);
+            } catch (err) {
+                errorDiv.classList.remove('hidden');
+                document.getElementById('step1-error-text').textContent = err.message;
+                btn.disabled = false;
+            } finally {
+                btnText.classList.remove('hidden');
+                btnLoader.classList.add('hidden');
+            }
+        }
+
+        function populateReview() {
+            document.getElementById('edit-name').value = profileData.name || '';
+            document.getElementById('edit-title').value = profileData.title || '';
+            document.getElementById('edit-location').value = profileData.location || '';
+            document.getElementById('edit-email').value = profileData.email || '';
+            document.getElementById('edit-linkedin').value = profileData.linkedin || '';
+            document.getElementById('edit-summary').value = profileData.summary || '';
+
+            // Auto-generate project name
+            const slug = (profileData.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            document.getElementById('project-name').value = slug || 'meu-portfolio';
+
+            // Experience
+            const expDiv = document.getElementById('exp-preview');
+            expDiv.innerHTML = '';
+            (profileData.experience || []).forEach(exp => {
+                expDiv.innerHTML += `<div class="bg-gray-50 rounded-lg p-3">
+                    <div class="flex justify-between"><span class="font-semibold text-sm">${exp.role || ''}</span><span class="text-xs text-gray-400">${exp.date || ''}</span></div>
+                    <span class="text-sm text-brand-500">${exp.company || ''}</span>
+                    ${exp.location ? `<span class="text-xs text-gray-400"> · ${exp.location}</span>` : ''}
+                    ${exp.description ? `<p class="text-xs text-gray-500 mt-1">${exp.description}</p>` : ''}
+                </div>`;
+            });
+
+            // Education
+            const eduDiv = document.getElementById('edu-preview');
+            eduDiv.innerHTML = '';
+            (profileData.education || []).forEach(edu => {
+                eduDiv.innerHTML += `<div class="bg-gray-50 rounded-lg p-3">
+                    <span class="font-semibold text-sm">${edu.school || ''}</span>
+                    ${edu.course ? `<span class="text-sm text-brand-500"> - ${edu.course}</span>` : ''}
+                    ${edu.date ? `<span class="text-xs text-gray-400 block">${edu.date}</span>` : ''}
+                </div>`;
+            });
+
+            // Skills
+            const skillsDiv = document.getElementById('skills-preview');
+            skillsDiv.innerHTML = '';
+            (profileData.skills || []).forEach(s => {
+                skillsDiv.innerHTML += `<span class="bg-brand-100 text-brand-700 px-3 py-1 rounded-full text-sm">${s}</span>`;
+            });
+
+            // Languages
+            const langsDiv = document.getElementById('langs-preview');
+            langsDiv.innerHTML = '';
+            (profileData.languages || []).forEach(l => {
+                langsDiv.innerHTML += `<span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">${l.name}${l.level ? ` (${l.level})` : ''}</span>`;
+            });
+        }
+
+        function collectEditedData() {
+            profileData.name = document.getElementById('edit-name').value;
+            profileData.title = document.getElementById('edit-title').value;
+            profileData.location = document.getElementById('edit-location').value;
+            profileData.email = document.getElementById('edit-email').value;
+            profileData.linkedin = document.getElementById('edit-linkedin').value;
+            profileData.summary = document.getElementById('edit-summary').value;
+            return profileData;
+        }
+
+        async function deployToVercel() {
+            const token = document.getElementById('vercel-token').value.trim();
+            const projectName = document.getElementById('project-name').value.trim();
+            const customDomain = document.getElementById('custom-domain').value.trim();
+            const errorDiv = document.getElementById('step3-error');
+            errorDiv.classList.add('hidden');
+
+            if (!token) { showError3('Insere o teu Vercel token.'); return; }
+            if (!projectName) { showError3('Insere um nome para o projeto.'); return; }
+
+            const btn = document.getElementById('btn-deploy');
+            const btnText = document.getElementById('btn-deploy-text');
+            const btnLoader = document.getElementById('btn-deploy-loader');
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnLoader.classList.remove('hidden');
+
+            try {
+                const data = collectEditedData();
+                const formData = new FormData();
+                formData.append('vercel_token', token);
+                formData.append('project_name', projectName);
+                formData.append('custom_domain', customDomain);
+                formData.append('profile_data', JSON.stringify(data));
+                formData.append('photo', photoFile);
+
+                const response = await fetch('/api/deploy', { method: 'POST', body: formData });
+                const result = await response.json();
+
+                if (!result.success) throw new Error(result.error || 'Deploy failed');
+
+                // Show success
+                const deployUrl = result.deployment.alias?.[0] || result.deployment.url;
+                document.getElementById('deployed-url').textContent = deployUrl;
+                document.getElementById('deployed-url').href = deployUrl;
+
+                const filesList = document.getElementById('files-list');
+                filesList.innerHTML = '';
+                (result.files_deployed || []).forEach(f => {
+                    filesList.innerHTML += `<li>&#x2713; ${f}</li>`;
+                });
+
+                if (customDomain && result.domain) {
+                    const domainDiv = document.getElementById('domain-info');
+                    domainDiv.classList.remove('hidden');
+                    if (result.domain.warning) {
+                        document.getElementById('domain-info-text').innerHTML = `<strong>Dominio:</strong> ${customDomain} foi adicionado mas precisa de configuracao DNS. Aponta um registo A para <code>76.76.21.21</code>.`;
+                    } else {
+                        document.getElementById('domain-info-text').innerHTML = `<strong>Dominio:</strong> ${customDomain} configurado com sucesso!`;
+                    }
+                }
+
+                goToStep(4);
+            } catch (err) {
+                showError3(err.message);
+                btn.disabled = false;
+            } finally {
+                btnText.classList.remove('hidden');
+                btnLoader.classList.add('hidden');
+            }
+        }
+
+        function showError3(msg) {
+            const errorDiv = document.getElementById('step3-error');
+            errorDiv.classList.remove('hidden');
+            document.getElementById('step3-error-text').textContent = msg;
+        }
+
+        function goToStep(n) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById(`step-${n}`).classList.add('active');
+
+            for (let i = 1; i <= 4; i++) {
+                const ind = document.getElementById(`ind-${i}`);
+                ind.classList.remove('completed', 'current', 'pending');
+                if (i < n) ind.classList.add('completed');
+                else if (i === n) ind.classList.add('current');
+                else ind.classList.add('pending');
+
+                if (i < 4) {
+                    const line = document.getElementById(`line-${i}-${i+1}`);
+                    line.style.backgroundColor = i < n ? '#4f63d2' : '#d1d5db';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
