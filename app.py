@@ -10,7 +10,13 @@ from flask import Flask, render_template, request, jsonify
 
 from lib.linkedin_parser import parse_linkedin_pdf
 from lib.site_generator import generate_portfolio_html
-from lib.cv_generator import generate_docx, generate_cv_html, generate_cv_pdf
+from lib.cv_generator import generate_docx, generate_cv_html
+
+try:
+    from lib.cv_generator import generate_cv_pdf
+    HAS_PLAYWRIGHT = True
+except Exception:
+    HAS_PLAYWRIGHT = False
 from lib.vercel_deploy import deploy_to_cloudflare, add_domain
 
 app = Flask(__name__)
@@ -88,24 +94,28 @@ def deploy():
         cv_pdf_name = f"CV {data.get('name', 'CV')}.pdf"
         cv_docx_name = f"CV {data.get('name', 'CV')}.docx"
 
-        # Generate portfolio HTML
-        site_html = generate_portfolio_html(data, photo_filename=photo_filename, cv_filename=cv_pdf_name)
-
-        # Generate CV HTML for PDF
+        # Generate CV HTML
         cv_html = generate_cv_html(data, photo_filename=photo_filename)
 
-        # Generate CV PDF
+        # The CV HTML page has a print button — user can print to PDF from browser
+        # Generate actual PDF only if Playwright is available (local dev)
         cv_pdf_bytes = None
         cv_pdf_path = None
-        try:
-            cv_pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-            cv_pdf_tmp.close()
-            generate_cv_pdf(cv_html, cv_pdf_tmp.name)
-            with open(cv_pdf_tmp.name, "rb") as f:
-                cv_pdf_bytes = f.read()
-            cv_pdf_path = cv_pdf_tmp.name
-        except Exception as e:
-            print(f"Warning: PDF generation failed: {e}")
+        cv_filename = "cv.html"
+        if HAS_PLAYWRIGHT:
+            try:
+                cv_pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+                cv_pdf_tmp.close()
+                generate_cv_pdf(cv_html, cv_pdf_tmp.name)
+                with open(cv_pdf_tmp.name, "rb") as f:
+                    cv_pdf_bytes = f.read()
+                cv_pdf_path = cv_pdf_tmp.name
+                cv_filename = cv_pdf_name
+            except Exception as e:
+                print(f"Warning: PDF generation failed: {e}")
+
+        # Generate portfolio HTML (links to CV PDF or CV HTML)
+        site_html = generate_portfolio_html(data, photo_filename=photo_filename, cv_filename=cv_filename)
 
         # Generate DOCX
         docx_bytes = None
